@@ -1,0 +1,23 @@
+{
+  "name": "pubmed-scraping",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "pnpm run build && npx functions-framework --target=pubmed-scraping",
+    "deploy:local": "pnpm run build && gcloud alpha functions local deploy local-pubmed-scraping --entry-point=pubmed-scraping --runtime=nodejs18",
+    "deploy": "npm run build && gcloud functions deploy pubmed-scraping --runtime=nodejs18 --region=asia-northeast1  --source=. --trigger-http --allow-unauthenticated --set-env-vars NODE_ENV=production"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.3.0",
+    "chrome-aws-lambda": "^10.1.0",
+    "puppeteer-core": "^21.1.0"
+  }
+}
