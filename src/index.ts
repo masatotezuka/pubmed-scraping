@@ -11,7 +11,6 @@ type ScrapingResult = {
 
 ff.http("pubmed-scraping", async (req: ff.Request, res: ff.Response) => {
   try {
-    console.log(req.body)
     res.set("Access-Control-Allow-Origin", "*")
     const body: { searchWords: string[] } = JSON.parse(req.body)
     const options =
@@ -40,7 +39,7 @@ ff.http("pubmed-scraping", async (req: ff.Request, res: ff.Response) => {
     await page.waitForSelector("a.docsum-title")
 
     const scrapingResults: ScrapingResult[] = []
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       //   10件目のタイトルが表示されるまで待つ
       await page.waitForSelector(
         `#search-results section div.search-results-chunks div article:nth-child(${
@@ -58,10 +57,8 @@ ff.http("pubmed-scraping", async (req: ff.Request, res: ff.Response) => {
         "#full-view-heading h1.heading-title",
         (el) => el.textContent
       )
-      const abstract = await page.$eval(
-        "#eng-abstract  p",
-        (el) => el.textContent
-      )
+      await page.waitForSelector("#abstract")
+      const abstract = await page.$eval("#abstract", (el) => el.textContent)
       const pubmedUrl = page.url()
       const originUrl = await page
         .$("#full-view-identifiers li:nth-child(3) span a")
