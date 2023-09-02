@@ -12,6 +12,12 @@ type ScrapingResult = {
 ff.http("pubmed-scraping", async (req: ff.Request, res: ff.Response) => {
   try {
     res.set("Access-Control-Allow-Origin", "*")
+    res.set("Access-Control-Allow-Methods", "GET, POST")
+    res.set("Access-Control-Allow-Headers", "Content-Type")
+    if (req.method === "OPTIONS") {
+      res.status(204).send("")
+    }
+
     const body: { searchWords: string[] } = JSON.parse(req.body)
     const options =
       process.env.NODE_ENV === "production"
