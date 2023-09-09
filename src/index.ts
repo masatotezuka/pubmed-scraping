@@ -1,6 +1,13 @@
 import * as ff from "@google-cloud/functions-framework"
 import core from "puppeteer-core"
-import chromium from "chrome-aws-lambda"
+import { getChromiumOptions } from "./function/getChromiumOptions"
+import {
+  PUBMED_URL,
+  SEARCH_BUTTON_SELECTOR,
+  FORM_SELECTOR,
+  PAPER_LINK_SELECTOR,
+} from "./constants"
+import { scrapeArticleDetails } from "./function/scrapeArticleDetails"
 
 type ScrapingResult = {
   title: string
@@ -10,71 +17,28 @@ type ScrapingResult = {
 }
 
 ff.http("pubmed-scraping", async (req: ff.Request, res: ff.Response) => {
+  res.set("Access-Control-Allow-Origin", "*")
+  res.set("Access-Control-Allow-Methods", "GET, POST")
+  res.set("Access-Control-Allow-Headers", "Content-Type")
+
   try {
-    res.set("Access-Control-Allow-Origin", "*")
-    res.set("Access-Control-Allow-Methods", "GET, POST")
-    res.set("Access-Control-Allow-Headers", "Content-Type")
-    if (req.method === "OPTIONS") {
-      res.status(204).send("")
-    }
-
-    const body: { searchWords: string[] } = JSON.parse(req.body)
-    const options =
-      process.env.NODE_ENV === "production"
-        ? {
-            args: chromium.args,
-            executablePath: await chromium.executablePath,
-            headless: chromium.headless,
-          }
-        : {
-            args: [],
-            executablePath:
-              "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            headless: false,
-          }
-
-    const browser = await core.launch(options)
+    const body: { searchWords: string[] } = req.body
+    const browser = await core.launch(await getChromiumOptions())
     const page = await browser.newPage()
-    await page.goto("https://pubmed.ncbi.nlm.nih.gov/")
+
+    await page.goto(PUBMED_URL)
     await page.type(
-      "#id_term",
+      FORM_SELECTOR,
       `${body.searchWords.map((word) => `"${word}"`).join(" ")}`
     )
-
-    await page.click("button.search-btn")
-    await page.waitForSelector("a.docsum-title")
+    await page.click(SEARCH_BUTTON_SELECTOR)
+    await page.waitForSelector(PAPER_LINK_SELECTOR)
 
     const scrapingResults: ScrapingResult[] = []
-    for (let i = 0; i < 10; i++) {
-      //   10件目のタイトルが表示されるまで待つ
-      await page.waitForSelector(
-        `#search-results section div.search-results-chunks div article:nth-child(${
-          i + 2
-        }) div.docsum-wrap div.docsum-content a`
-      )
-      await page.click(
-        `#search-results section div.search-results-chunks div article:nth-child(${
-          i + 2
-        }) div.docsum-wrap div.docsum-content a`
-      )
-      await page.waitForSelector("#full-view-heading h1")
 
-      const title = await page.$eval(
-        "#full-view-heading h1.heading-title",
-        (el) => el.textContent
-      )
-      await page.waitForSelector("#abstract")
-      const abstract = await page.$eval("#abstract", (el) => el.textContent)
-      const pubmedUrl = page.url()
-      const originUrl = await page
-        .$("#full-view-identifiers li:nth-child(3) span a")
-        .then((el) => el?.evaluate((el) => el.getAttribute("href")))
-      scrapingResults.push({
-        title: title ?? "No title",
-        abstract: abstract ?? "No abstract",
-        pubmedUrl: pubmedUrl ?? "No pubmedUrl",
-        originUrl: originUrl ?? "No originUrl",
-      })
+    for (let i = 0; i < 10; i++) {
+      const result = await scrapeArticleDetails({ page, index: i })
+      scrapingResults.push(result)
       await page.goBack()
     }
 
